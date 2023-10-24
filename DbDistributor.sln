@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbDistributor", "DbDistributor\DbDistributor.csproj", "{BC521212-9F09-4042-A868-78656DBB2646}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbDistributorTests", "DbDistributorTests\DbDistributorTests.csproj", "{6EBA83C6-BDD8-49A7-9BBD-784084334103}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BC521212-9F09-4042-A868-78656DBB2646}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC521212-9F09-4042-A868-78656DBB2646}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC521212-9F09-4042-A868-78656DBB2646}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC521212-9F09-4042-A868-78656DBB2646}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EBA83C6-BDD8-49A7-9BBD-784084334103}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EBA83C6-BDD8-49A7-9BBD-784084334103}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EBA83C6-BDD8-49A7-9BBD-784084334103}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EBA83C6-BDD8-49A7-9BBD-784084334103}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

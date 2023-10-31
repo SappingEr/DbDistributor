@@ -7,5 +7,5 @@ public class Distributor
 	public Distributor(DataBase dataBase)
 		=> _dataBase = dataBase ?? throw new ArgumentNullException(nameof(dataBase));
 
-	public void Distribute(Row row) => _dataBase.AddRow(row);
+	public async Task DistributeAsync(Row row) => await _dataBase.AddRowAsync(row);
 }

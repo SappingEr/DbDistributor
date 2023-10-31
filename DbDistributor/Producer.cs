@@ -2,5 +2,12 @@ namespace DbDistributor;
 
 public class Producer
 {
-	public static Row GenerateRow() => new() { Data = Guid.NewGuid().ToString() };
+	public int Id { get; init; }
+	
+	
+	public async Task<Row> GenerateRowAsync()
+	{
+		await Task.Delay(new Random().Next(10, 50));
+		return new Row { ProducerId = Id, Data = Guid.NewGuid().ToString() };
+	}
 }

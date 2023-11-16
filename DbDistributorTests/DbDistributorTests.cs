@@ -4,44 +4,53 @@ namespace DbDistributorTests;
 
 public class Tests
 {
+	private const int RowsByUserCount = 3;
+	private const int ProducersCount = 100;
+	
 	[Test]
 	public async Task Distribute()
 	{
-		var rowsByUserCount = 3;
-		var producersCount = 100;
-		var rowsCount = rowsByUserCount * producersCount;
-		var dataBase = new DataBase();
-		var distributor = new Distributor(dataBase);
-		var producers = GetProducers(producersCount).ToList();
-		var tasks = new List<Task>();
-		foreach (var producer in producers)
-		{
-			tasks.Add(AddRowsAsync(producer, distributor, rowsByUserCount));
-		}
-		await Task.WhenAll(tasks);
 		
-		var resultRowCount = dataBase.RowCount;
-		var resultProducersCount = dataBase.Rows.GroupBy(r=>r.ProducerId).Count();
-		var resultRowPerProducer = dataBase.Rows
-			.GroupBy(r => r.ProducerId).Average(r=>r.Count());
-		var resultGroupByIdCount = dataBase.Rows.GroupBy(r => r.Id).Count();
-
-		Console.WriteLine($"Row count: {dataBase.RowCount}");
-		Console.WriteLine($"Db Id: {dataBase.Id}");
-
-		foreach (var row in dataBase.Rows)
+		var rowsCount = RowsByUserCount * ProducersCount;
+		var zones = new[]
 		{
-			Console.WriteLine($"Row {row.Id}:  Producer: {row.ProducerId}   Data: {row.Data}");
+			new Zone { From = 0, To = 32 },
+			new Zone { From = 33, To = 65 },
+			new Zone { From = 66, To = 100 }
+		};
+		var distributor = new Distributor(zones);
+		var producers = GetProducers(ProducersCount).ToList();
+		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByUserCount)).ToList();
+		await Task.WhenAll(tasks);
+
+		var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
+		var resultProducersCount = distributor.DataBases.SelectMany(db=>db.Rows)
+			.GroupBy(r => r.ProducerId).Count();
+		var resultRowPerProducer = distributor.DataBases.SelectMany(db=>db.Rows)
+			.GroupBy(r => r.ProducerId).Average(r => r.Count());
+		var resultGroupByIdCount = distributor.DataBases.SelectMany(db=>db.Rows).GroupBy(r => r.Id).Count();
+
+		Console.WriteLine($"All rows count: {resultRowCount}");
+
+		foreach (var dataBase in distributor.DataBases)
+		{
+			Console.WriteLine($"DataBase Id: {dataBase.Id}	Rows count: {dataBase.RowCount}");
+			Console.WriteLine($"Db Id: {dataBase.Id}");
+
+			foreach (var row in dataBase.Rows)
+			{
+				Console.WriteLine($"Producer: {row.ProducerId}	Row: {row.Id}	Data: {row.Data}");
+			}
 		}
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(resultRowCount, Is.EqualTo(rowsCount));
-            Assert.That(resultProducersCount, Is.EqualTo(producersCount));
-            Assert.That(resultRowPerProducer, Is.EqualTo(rowsByUserCount));
+		Assert.Multiple(() =>
+		{
+			Assert.That(resultRowCount, Is.EqualTo(rowsCount));
+			Assert.That(resultProducersCount, Is.EqualTo(ProducersCount));
+			Assert.That(resultRowPerProducer, Is.EqualTo(RowsByUserCount));
 			Assert.That(resultGroupByIdCount, Is.EqualTo(rowsCount));
-        });
-    }
+		});
+	}
 
 	private IEnumerable<Producer> GetProducers(int count)
 	{
@@ -51,7 +60,7 @@ public class Tests
 		{
 			producers[i] = new Producer { Id = i };
 		}
-		
+
 		return producers;
 	}
 

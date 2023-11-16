@@ -1,28 +1,38 @@
+using System.Collections.Concurrent;
+
 namespace DbDistributor;
 
 public class Distributor
 {
-	private readonly Dictionary<int, DataBase> _dataBases = new();
+	private readonly int _count;
+	private readonly Zone[] _zones;
+	private readonly ConcurrentDictionary<int, DataBase> _dataBases = new();
 	
-	public Distributor(IEnumerable<DataBase> dataBases)
+	public Distributor(IEnumerable<Zone> zones)
 	{
-		if (dataBases is null)
-			throw new ArgumentNullException(nameof(dataBases));
-
-		var count = 1;
-
-		foreach (var dataBase in dataBases)
+		if (zones is null)
+			throw new ArgumentNullException(nameof(zones));
+		
+		_zones = zones.ToArray();
+		
+		foreach (var zone in _zones)
 		{
-			_dataBases.Add(count, dataBase);
-			count++;
+			zone.DataBaseIndex = _count;
+			_dataBases.TryAdd(_count, new DataBase());
+			_count++;
 		}
 	}
-
+	
+	public IEnumerable<DataBase> DataBases => _dataBases.Values;
 
 	public async Task DistributeAsync(Row row)
 	{
-		var dbId = row.ProducerId % _dataBases.Count;
-		var dataBase = _dataBases[dbId];
-		await dataBase.AddRowAsync(row);
+		foreach (var zone in _zones)
+		{
+			if (zone.From <= row.ProducerId && row.ProducerId <= zone.To)
+			{
+				await _dataBases[zone.DataBaseIndex].AddRowAsync(row);
+			}
+		}
 	}
 }

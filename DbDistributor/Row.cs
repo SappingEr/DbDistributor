@@ -1,6 +1,6 @@
 namespace DbDistributor;
 
-public class Row
+public record Row
 {
 	public int ProducerId { get; init; }
 	public string Data { get; init; } = null!;

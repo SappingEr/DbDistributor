@@ -4,22 +4,18 @@ namespace DbDistributorTests;
 
 public class Tests
 {
+	private const int DataBaseCount = 3;
+	private const int RowsByProducerCount = 3;
+	private const int ProducersCount = 100;
+	
 	[Test]
 	public async Task Distribute()
 	{
-		const int rowsByUserCount = 3;
-		const int producersCount = 100;
-		var rowsCount = rowsByUserCount * producersCount;
-		var dataBases = GetDataBases(3);
+		const int rowsCount = RowsByProducerCount * ProducersCount;
+		var dataBases = GetDataBases(DataBaseCount);
 		var distributor = new Distributor(dataBases);
-		var producers = GetProducers(producersCount).ToList();
-		var tasks = new List<Task>();
-		
-		foreach (var producer in producers)
-		{
-			tasks.Add(AddRowsAsync(producer, distributor, rowsByUserCount));
-		}
-
+		var producers = GetProducers(ProducersCount).ToList();
+		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
 		await Task.WhenAll(tasks);
 
 		var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
@@ -29,26 +25,55 @@ public class Tests
 			.GroupBy(r => r.ProducerId).Average(r => r.Count());
 		var resultGroupByIdCount = distributor.DataBases.SelectMany(db=>db.Rows).GroupBy(r => r.Id).Count();
 
-		Console.WriteLine($"All rows count: {resultRowCount}");
-
-		foreach (var dataBase in distributor.DataBases)
-		{
-			Console.WriteLine($"DataBase Id: {dataBase.Id}	Rows count: {dataBase.RowCount}");
-			Console.WriteLine($"Db Id: {dataBase.Id}");
-
-			foreach (var row in dataBase.Rows)
-			{
-				Console.WriteLine($"Producer: {row.ProducerId}	Row: {row.Id}	Data: {row.Data}");
-			}
-		}
+		WriteDataBasesData(distributor);
 
 		Assert.Multiple(() =>
 		{
 			Assert.That(resultRowCount, Is.EqualTo(rowsCount));
-			Assert.That(resultProducersCount, Is.EqualTo(producersCount));
-			Assert.That(resultRowPerProducer, Is.EqualTo(rowsByUserCount));
+			Assert.That(resultProducersCount, Is.EqualTo(ProducersCount));
+			Assert.That(resultRowPerProducer, Is.EqualTo(RowsByProducerCount));
 			Assert.That(resultGroupByIdCount, Is.EqualTo(rowsCount));
 		});
+	}
+	
+	[Test]
+	public async Task RemoveDataBase()
+	{
+		var dataBases = GetDataBases(3);
+		var distributor = new Distributor(dataBases);
+		var producers = GetProducers(ProducersCount).ToList();
+		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
+
+		await Task.WhenAll(tasks);
+		
+		WriteDataBasesData(distributor);
+		var rows = distributor.DestroyDataBaseAndGetRows();
+		var producerId = rows.First().ProducerId;
+		tasks = rows.Select(row => distributor.DistributeAsync(row)).ToList();
+		await Task.WhenAll(tasks);
+		WriteDataBasesData(distributor);
+
+		var producerRows = distributor.GetProducerDataById(producerId);
+		
+		Assert.That(producerRows.Count(), Is.EqualTo(ProducersCount));
+	}
+	
+	[Test]
+	public async Task AddDataBase()
+	{
+		var dataBases = GetDataBases(3);
+		var distributor = new Distributor(dataBases);
+		var producers = GetProducers(ProducersCount).ToList();
+		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
+
+		await Task.WhenAll(tasks);
+		
+		WriteDataBasesData(distributor);
+		distributor.AddNewDataBase();
+		var producerId = distributor.DataBases.First().Rows.Last().ProducerId;
+		var producerRows = distributor.GetProducerDataById(producerId).ToList();
+		
+		Assert.That(producerRows, Is.Empty);
 	}
 
 	private IEnumerable<Producer> GetProducers(int count)
@@ -75,12 +100,27 @@ public class Tests
 		return dataBases;
 	}
 
-
 	private async Task AddRowsAsync(Producer producer, Distributor distributor, int count)
 	{
 		for (var i = 0; i < count; i++)
 		{
 			await distributor.DistributeAsync(await producer.GenerateRowAsync());
 		}
+	}
+
+	private void WriteDataBasesData(Distributor distributor)
+	{
+		foreach (var dataBase in distributor.DataBases)
+		{
+			Console.WriteLine($"Db Id: {dataBase.Id}");
+			Console.WriteLine($"Rows count: {dataBase.RowCount}");
+
+			foreach (var row in dataBase.Rows)
+			{
+				Console.WriteLine($"Producer: {row.ProducerId}	Row: {row.Id}	Data: {row.Data}");
+			}
+		}
+
+		Console.WriteLine();
 	}
 }

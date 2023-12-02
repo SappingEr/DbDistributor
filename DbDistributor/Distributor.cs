@@ -28,28 +28,40 @@ public class Distributor
 		_dataBases.TryAdd(newKey, new DataBase());
 	}
 	
-	public IEnumerable<DbRow> DestroyDataBaseAndGetRows()
+	public async Task<IEnumerable<DbRow>> DestroyDataBaseAndGetRows()
 	{
 		var key = _dataBases.Keys.Max();
-		var rows = _dataBases[key].Rows;
-		_dataBases.TryRemove(key, out _);
-		return rows;
+		var rows = _dataBases[key].Rows.ToList();
+		
+		if (_dataBases.TryRemove(key, out _))
+		{
+			var tasks = rows.Select(async r  =>
+			{
+				await _dataBases[GetDataBaseIdByRendezvous(r.ProducerId)].AddRowAsync(r);
+			}).ToList();
+			await Task.WhenAll(tasks);
+			return rows;
+		}
+
+		return Enumerable.Empty<DbRow>();
 	}
 
 	public async Task DistributeAsync(Row row)
 	{
-		var dataBaseId = GetDataBaseId(row.ProducerId);
-		await _dataBases[dataBaseId].AddRowAsync(row);
+		var dataBaseId = GetDataBaseIdByRendezvous(row.ProducerId);
+		await _dataBases[dataBaseId].AddRowAsync(new DbRow{ProducerId = row.ProducerId, Data = row.Data});
 	}
 	
 	public IEnumerable<DbRow> GetProducerDataById(int producerId)
 	{
-		var dataBaseId = GetDataBaseId(producerId);
+		var dataBaseId = GetDataBaseIdByRendezvous(producerId);
 		return _dataBases[dataBaseId].Rows.Where(r=>r.ProducerId == producerId);
 	}
 
-	private int GetDataBaseId(int producerId)
-	{
-		return producerId % _dataBases.Count;
-	}
+	private int GetDataBaseIdByRendezvous(int producerId)
+		=> _dataBases.Keys.Select(dataBaseId => CalculateScore(producerId, dataBaseId)).MaxBy(p => p.Item2).Item1;
+
+	private (int, int) CalculateScore(int producerId, int dataBaseId)
+		=> (dataBaseId, (producerId + dataBaseId) % _dataBases.Count);
 }
+

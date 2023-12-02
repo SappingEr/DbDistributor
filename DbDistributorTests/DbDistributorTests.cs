@@ -43,19 +43,20 @@ public class Tests
 		var distributor = new Distributor(dataBases);
 		var producers = GetProducers(ProducersCount).ToList();
 		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
-
 		await Task.WhenAll(tasks);
 		
 		WriteDataBasesData(distributor);
-		var rows = distributor.DestroyDataBaseAndGetRows();
-		var producerId = rows.First().ProducerId;
-		tasks = rows.Select(row => distributor.DistributeAsync(row)).ToList();
-		await Task.WhenAll(tasks);
+		var rows = (await distributor.DestroyDataBaseAndGetRows()).ToList();
+		var producerIds = rows.Select(r => r.ProducerId).Distinct();
 		WriteDataBasesData(distributor);
 
-		var producerRows = distributor.GetProducerDataById(producerId);
+		foreach (var producerId in producerIds)
+		{
+			var rowsFromOldDb = rows.Where(r=>r.ProducerId == producerId).OrderBy(r=>r.Id);
+			var rowsByProducerId = distributor.GetProducerDataById(producerId).OrderBy(r=>r.Id);
 		
-		Assert.That(producerRows.Count(), Is.EqualTo(ProducersCount));
+			CollectionAssert.AreEqual(rowsFromOldDb, rowsByProducerId);
+		}
 	}
 	
 	[Test]
@@ -65,15 +66,16 @@ public class Tests
 		var distributor = new Distributor(dataBases);
 		var producers = GetProducers(ProducersCount).ToList();
 		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
-
 		await Task.WhenAll(tasks);
 		
 		WriteDataBasesData(distributor);
 		distributor.AddNewDataBase();
-		var producerId = distributor.DataBases.First().Rows.Last().ProducerId;
-		var producerRows = distributor.GetProducerDataById(producerId).ToList();
 		
-		Assert.That(producerRows, Is.Empty);
+		foreach (var producer in producers)
+		{
+			var producerRows = distributor.GetProducerDataById(producer.Id).ToList();
+			CollectionAssert.IsNotEmpty(producerRows);
+		}
 	}
 
 	private IEnumerable<Producer> GetProducers(int count)

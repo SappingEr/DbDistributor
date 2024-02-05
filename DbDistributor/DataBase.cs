@@ -8,7 +8,7 @@ public class DataBase
 	public Guid Id { get; } = Guid.NewGuid();
 	public ConcurrentBag<DbRow> Rows { get; } = new();
 
-	
+
 	public async Task AddRowAsync(DbRow row)
 	{
 		await Task.Delay(new Random().Next(50, 100));

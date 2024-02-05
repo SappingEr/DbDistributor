@@ -1,5 +1,6 @@
 namespace DbDistributor;
 
+// Сможет ли ГетСет написать 
 public record Row
 {
 	public int ProducerId { get; init; }

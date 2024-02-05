@@ -7,7 +7,7 @@ public class Tests
 	private const int DataBaseCount = 3;
 	private const int RowsByProducerCount = 3;
 	private const int ProducersCount = 100;
-	
+
 	[Test]
 	public async Task Distribute()
 	{
@@ -19,11 +19,11 @@ public class Tests
 		await Task.WhenAll(tasks);
 
 		var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
-		var resultProducersCount = distributor.DataBases.SelectMany(db=>db.Rows)
-			.GroupBy(r => r.ProducerId).Count();
-		var resultRowPerProducer = distributor.DataBases.SelectMany(db=>db.Rows)
-			.GroupBy(r => r.ProducerId).Average(r => r.Count());
-		var resultGroupByIdCount = distributor.DataBases.SelectMany(db=>db.Rows).GroupBy(r => r.Id).Count();
+		var resultProducersCount = distributor.DataBases.SelectMany(db => db.Rows)
+											  .GroupBy(r => r.ProducerId).Count();
+		var resultRowPerProducer = distributor.DataBases.SelectMany(db => db.Rows)
+											  .GroupBy(r => r.ProducerId).Average(r => r.Count());
+		var resultGroupByIdCount = distributor.DataBases.SelectMany(db => db.Rows).GroupBy(r => r.Id).Count();
 
 		WriteDataBasesData(distributor);
 
@@ -35,7 +35,7 @@ public class Tests
 			Assert.That(resultGroupByIdCount, Is.EqualTo(rowsCount));
 		});
 	}
-	
+
 	[Test]
 	public async Task RemoveDataBase()
 	{
@@ -44,21 +44,19 @@ public class Tests
 		var producers = GetProducers(ProducersCount).ToList();
 		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
 		await Task.WhenAll(tasks);
-		
+
 		WriteDataBasesData(distributor);
-		var rows = (await distributor.DestroyDataBaseAndGetRows()).ToList();
-		var producerIds = rows.Select(r => r.ProducerId).Distinct();
+		await distributor.DestroyDataBase();
 		WriteDataBasesData(distributor);
 
-		foreach (var producerId in producerIds)
+		foreach (var producer in producers)
 		{
-			var rowsFromOldDb = rows.Where(r=>r.ProducerId == producerId).OrderBy(r=>r.Id);
-			var rowsByProducerId = distributor.GetProducerDataById(producerId).OrderBy(r=>r.Id);
-		
-			CollectionAssert.AreEqual(rowsFromOldDb, rowsByProducerId);
+			var producerRows = distributor.GetProducerDataById(producer.Id).ToList();
+			CollectionAssert.IsNotEmpty(producerRows);
+			Assert.That(producerRows.Count, Is.EqualTo(RowsByProducerCount));
 		}
 	}
-	
+
 	[Test]
 	public async Task AddDataBase()
 	{
@@ -67,14 +65,18 @@ public class Tests
 		var producers = GetProducers(ProducersCount).ToList();
 		var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
 		await Task.WhenAll(tasks);
-		
+
 		WriteDataBasesData(distributor);
 		distributor.AddNewDataBase();
+		
+		tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByProducerCount)).ToList();
+		await Task.WhenAll(tasks);
 		
 		foreach (var producer in producers)
 		{
 			var producerRows = distributor.GetProducerDataById(producer.Id).ToList();
 			CollectionAssert.IsNotEmpty(producerRows);
+			Assert.That(producerRows.Count, Is.EqualTo(RowsByProducerCount * 2));
 		}
 	}
 
@@ -84,7 +86,7 @@ public class Tests
 
 		for (var i = 0; i < producers.Length; i++)
 		{
-			producers[i] = new Producer { Id = i };
+			producers[i] = new Producer { Id = i + 1 };
 		}
 
 		return producers;
@@ -93,12 +95,12 @@ public class Tests
 	private IEnumerable<DataBase> GetDataBases(int count)
 	{
 		var dataBases = new DataBase[count];
-		
-		for (int i = 0; i < count; i++)
+
+		for (var i = 0; i < count; i++)
 		{
 			dataBases[i] = new DataBase();
 		}
-		
+
 		return dataBases;
 	}
 

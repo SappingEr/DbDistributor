@@ -2,49 +2,60 @@ using DbDistributor;
 
 namespace DbDistributorTests;
 
-public class DbDistributorTests
+[TestFixture]
+public class Tests
 {
-    private const int ProducerCount = 100;
-    private const int RowsPerProducer = 3;
+    private const int RowsByUserCount = 3;
+    private const int ProducersCount = 100;
 
     [Test]
-    public void Distribute()
+    public async Task Distribute()
     {
-        var producers = GetProducers(ProducerCount);
+        const int rowsCount = RowsByUserCount * ProducersCount;
         var dataBase = new DataBase();
         var distributor = new Distributor(dataBase);
+        var producers = GetProducers(ProducersCount).ToList();
+        var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByUserCount)).ToList();
 
-        foreach (var producer in producers)
-        {
-            for (var j = 0; j < RowsPerProducer; j++)
-            {
-                distributor.Distribute(producer.GenerateRow());
-            }
-        }
+        await Task.WhenAll(tasks);
 
-        var result = dataBase.Rows.GroupBy(r => r.Id).Count();
+        var resultRowCount = dataBase.RowCount;
+        var resultProducersCount = dataBase.Rows.GroupBy(r => r.ProducerId).Count();
+        var resultRowPerProducer = dataBase.Rows
+                                           .GroupBy(r => r.ProducerId)
+                                           .Average(r => r.Count());
+        var resultGroupByIdCount = dataBase.Rows.GroupBy(r => r.Id).Count();
 
         Console.WriteLine($"Row count: {dataBase.RowCount}");
         Console.WriteLine($"Db Id: {dataBase.Id}");
 
         foreach (var row in dataBase.Rows)
         {
-            Console.WriteLine($"Row: {row.Id}, Producer: {row.ProducerId}, Data: {row.Data}");
+            Console.WriteLine($"ProducerId: {row.ProducerId}	Row: {row.Id}	Data: {row.Data}");
         }
 
-        Assert.That(result, Is.EqualTo(ProducerCount * RowsPerProducer));
-        Assert.That(result, Is.EqualTo(dataBase.RowCount));
+        Assert.Multiple(() =>
+        {
+            Assert.That(resultRowCount, Is.EqualTo(rowsCount));
+            Assert.That(resultProducersCount, Is.EqualTo(ProducersCount));
+            Assert.That(resultRowPerProducer, Is.EqualTo(RowsByUserCount));
+            Assert.That(resultGroupByIdCount, Is.EqualTo(rowsCount));
+        });
     }
 
-    private IEnumerable<Producer> GetProducers(int count)
+    private static IEnumerable<Producer> GetProducers(int count)
     {
-        var producers = new Producer[count];
-
-        for (var i = 0; i < producers.Length; i++)
+        for (var i = 0; i < count; i++)
         {
-            producers[i] = new Producer { Id = i };
+            yield return new Producer { Id = i };
         }
+    }
 
-        return producers;
+    private static async Task AddRowsAsync(Producer producer, Distributor distributor, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            await distributor.DistributeAsync(await producer.GenerateRowAsync());
+        }
     }
 }

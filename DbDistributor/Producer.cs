@@ -4,10 +4,9 @@ public class Producer
 {
     public int Id { get; init; }
 
-    public Row GenerateRow()
+    public async Task<Row> GenerateRowAsync()
     {
-        var random = new Random();
-        Thread.Sleep(random.Next(100, 300));
+        await Task.Delay(new Random().Next(100, 300));
         return new Row { ProducerId = Id, Data = Guid.NewGuid().ToString() };
     }
 }

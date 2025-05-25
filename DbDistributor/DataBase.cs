@@ -1,15 +1,16 @@
-﻿namespace DbDistributor;
+﻿using System.Collections.Concurrent;
+
+namespace DbDistributor;
 
 public class DataBase
 {
     public int RowCount => Rows.Count;
     public Guid Id { get; } = Guid.NewGuid();
-    public List<DbRow> Rows { get; } = [];
+    public ConcurrentBag<DbRow> Rows { get; } = [];
 
-    public void AddRow(Row row)
+    public async Task AddRowAsync(Row row)
     {
-        var random = new Random();
-        Thread.Sleep(random.Next(50, 100));
+        await Task.Delay(new Random().Next(50, 100));
         Rows.Add(new DbRow { ProducerId = row.ProducerId, Data = row.Data });
     }
 }

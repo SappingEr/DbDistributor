@@ -3,7 +3,7 @@ using DbDistributor;
 namespace DbDistributorTests;
 
 [TestFixture]
-public class Tests
+public class DbDistributorTests
 {
     private const int DataBaseCount = 3;
     private const int RowsByUserCount = 3;
@@ -20,10 +20,14 @@ public class Tests
         await Task.WhenAll(tasks);
 
         var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
-        var resultProducersCount = distributor.DataBases.SelectMany(db => db.Rows)
-            .GroupBy(r => r.Value.ProducerId).Count();
-        var resultRowPerProducer = distributor.DataBases.SelectMany(db => db.Rows)
-            .GroupBy(r => r.Value.ProducerId).Average(r => r.Count());
+        var resultProducersCount = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Count();
+        var resultRowPerProducer = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Average(r => r.Count());
         var resultGroupByIdCount = distributor.DataBases.SelectMany(db => db.Rows).GroupBy(r => r.Key).Count();
 
         WriteDataBasesDataToConsole(distributor);
@@ -38,7 +42,7 @@ public class Tests
     }
 
     [Test]
-    public async Task DistributeAndAdd()
+    public async Task DistributeAndAddDb()
     {
         var dataBases = GetDataBases(DataBaseCount);
         var distributor = new Distributor(dataBases);
@@ -48,11 +52,17 @@ public class Tests
         await distributor.AddDatabaseAsync();
 
         var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
-        var resultProducersCount = distributor.DataBases.SelectMany(db => db.Rows)
-            .GroupBy(r => r.Value.ProducerId).Count();
-        var resultRowPerProducer = distributor.DataBases.SelectMany(db => db.Rows)
-            .GroupBy(r => r.Value.ProducerId).Average(r => r.Count());
-        var resultGroupByIdCount = distributor.DataBases.SelectMany(db => db.Rows).GroupBy(r => r.Key).Count();
+        var resultProducersCount = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Count();
+        var resultRowPerProducer = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Average(r => r.Count());
+        var resultGroupByIdCount = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Key).Count();
 
         WriteDataBasesDataToConsole(distributor);
 
@@ -63,6 +73,42 @@ public class Tests
             Assert.That(resultRowPerProducer, Is.EqualTo(RowsByUserCount));
             Assert.That(resultGroupByIdCount, Is.EqualTo(RowsCount));
         });
+    }
+
+    [Test]
+    public async Task DistributeAndRemoveDb()
+    {
+        var dataBases = GetDataBases(DataBaseCount);
+        var distributor = new Distributor(dataBases);
+        var producers = GetProducers(ProducersCount).ToList();
+        var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByUserCount)).ToList();
+        await Task.WhenAll(tasks);
+        await distributor.RemoveDatabaseAsync(1);
+
+        var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
+        var resultProducersCount = distributor.DataBases.SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Count();
+        var resultRowPerProducer = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Value.ProducerId)
+            .Average(g => g.Count());
+        var resultGroupByIdCount = distributor.DataBases
+            .SelectMany(db => db.Rows)
+            .GroupBy(r => r.Key)
+            .Count();
+
+        WriteDataBasesDataToConsole(distributor);
+        
+        Assert.Multiple(() =>
+        {
+            Assert.That(distributor.DataBases, Has.Count.EqualTo(DataBaseCount - 1));
+            Assert.That(resultRowCount, Is.EqualTo(RowsCount));
+            Assert.That(resultProducersCount, Is.EqualTo(ProducersCount));
+            Assert.That(resultRowPerProducer, Is.EqualTo(RowsByUserCount));
+            Assert.That(resultGroupByIdCount, Is.EqualTo(RowsCount));
+        });
+
     }
 
     private static IEnumerable<DataBase> GetDataBases(int count)
@@ -93,7 +139,7 @@ public class Tests
         }
     }
 
-    private void WriteDataBasesDataToConsole(Distributor distributor)
+    private static void WriteDataBasesDataToConsole(Distributor distributor)
     {
         foreach (var dataBase in distributor.DataBases)
         {

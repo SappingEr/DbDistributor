@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbDistributor", "DbDistributor\DbDistributor.csproj", "{3D920404-C42B-494F-A004-84B495B076B6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbDistributorTests", "DbDistributorTests\DbDistributorTests.csproj", "{9FB9F541-9385-4C2B-8AAE-12F5178311B0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D920404-C42B-494F-A004-84B495B076B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D920404-C42B-494F-A004-84B495B076B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D920404-C42B-494F-A004-84B495B076B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D920404-C42B-494F-A004-84B495B076B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FB9F541-9385-4C2B-8AAE-12F5178311B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FB9F541-9385-4C2B-8AAE-12F5178311B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FB9F541-9385-4C2B-8AAE-12F5178311B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FB9F541-9385-4C2B-8AAE-12F5178311B0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

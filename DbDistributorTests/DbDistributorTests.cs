@@ -83,7 +83,7 @@ public class DbDistributorTests
         var producers = GetProducers(ProducersCount).ToList();
         var tasks = producers.Select(producer => AddRowsAsync(producer, distributor, RowsByUserCount)).ToList();
         await Task.WhenAll(tasks);
-        await distributor.RemoveDatabaseAsync(1);
+        await distributor.RemoveDatabaseAsync(3);
 
         var resultRowCount = distributor.DataBases.Sum(db => db.RowCount);
         var resultProducersCount = distributor.DataBases.SelectMany(db => db.Rows)

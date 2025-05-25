@@ -5,32 +5,39 @@ namespace DbDistributor;
 public class Distributor
 {
     private readonly ConcurrentDictionary<int, DataBase> _dataBases = new();
-    private readonly ConcurrentDictionary<int, int> _producerDataMap = new();
+
+    private readonly SortedDictionary<int, int> _hashRing = new();
+    private const int VirtualNodes = 99;//Virtual baskets allow you to specify distribution intervals.
+
 
     public Distributor(IEnumerable<DataBase> dataBases)
     {
         ArgumentNullException.ThrowIfNull(dataBases);
 
-        var count = 1;
+        var id = 1;
 
-        foreach (var dataBase in dataBases)
+        foreach (var db in dataBases)
         {
-            _dataBases.TryAdd(count++, dataBase);
+            _dataBases.TryAdd(id++, db);
         }
+
+        RebuildHashRing();
     }
 
     public IReadOnlyCollection<DataBase> DataBases => _dataBases.Values.ToList();
 
     public async Task DistributeAsync(Row row)
     {
-        var dataBaseId = _producerDataMap.GetOrAdd(row.ProducerId, GetDataBaseIdByRendezvous);
-        await _dataBases[dataBaseId].AddRowAsync(new DbRow { ProducerId = row.ProducerId, Data = row.Data });
+        var dataBaseId = GetDataBaseIdByConsistent(row.ProducerId);
+
+        await _dataBases[dataBaseId]
+            .AddRowAsync(new DbRow { ProducerId = row.ProducerId, Data = row.Data });
     }
 
     public IEnumerable<DbRow> GetProducerDataById(int producerId)
     {
-        var dataBaseId = _producerDataMap.GetOrAdd(producerId, GetDataBaseIdByRendezvous);
-        return _dataBases[dataBaseId].Rows.Values.Where(row => row.ProducerId == producerId);
+        var dataBaseId = GetDataBaseIdByConsistent(producerId);
+        return _dataBases[dataBaseId].Rows.Values.Where(r => r.ProducerId == producerId);
     }
 
     public async Task AddDatabaseAsync()
@@ -38,11 +45,11 @@ public class Distributor
         var newId = _dataBases.Count + 1;
         _dataBases.TryAdd(newId, new DataBase());
 
-        _producerDataMap.Clear();
+        RebuildHashRing();
 
         var tasks = _dataBases
-            .Where(d => d.Key != newId)
-            .Select(async dataBase => await MoveRowsAsync(dataBase.Key, dataBase.Value));
+                    .Where(d => d.Key != newId)
+                    .Select(d => MoveRowsAsync(d.Key, d.Value));
 
         await Task.WhenAll(tasks);
     }
@@ -55,28 +62,42 @@ public class Distributor
         if (!_dataBases.TryRemove(databaseId, out var removedDb))
             throw new KeyNotFoundException($"Database with id {databaseId} not found.");
 
-        _producerDataMap.Clear();
+        RebuildHashRing();
 
         await MoveRowsAsync(databaseId, removedDb);
     }
 
-    private int GetDataBaseIdByRendezvous(int producerId)
-        => _dataBases.Keys.Select(dataBaseId => CalculateScore(producerId, dataBaseId)).MaxBy(p => p.Item2).Item1;
-
-    private (int, int) CalculateScore(int producerId, int dataBaseId) =>
-        (dataBaseId, (producerId + dataBaseId) % _dataBases.Count);
-
     private async Task MoveRowsAsync(int index, DataBase dataBase)
     {
-        foreach (var row in dataBase.Rows)
+        foreach (var kv in dataBase.Rows)
         {
-            var dataBaseId = GetDataBaseIdByRendezvous(row.Value.ProducerId);
-
-            if (dataBaseId == index)
-                continue;
-
-            await DistributeAsync(row.Value);
-            dataBase.Rows.TryRemove(row.Key, out _);
+            await DistributeAsync(kv.Value);
+            dataBase.Rows.TryRemove(kv.Key, out _);
         }
     }
+
+    private void RebuildHashRing() //In this algorithm, the data distribution zones of the ring can be specified. In this case, it is simply a round robin.
+    {
+        _hashRing.Clear();
+
+        for (var i = 0; i < VirtualNodes; i++)
+        {
+            var groupIndex = i % _dataBases.Count + 1;
+            _hashRing[i] = groupIndex;
+        }
+    }
+
+    private int GetDataBaseIdByConsistent(int producerId)
+    {
+        if (_hashRing.Count == 0)
+            throw new InvalidOperationException("Hash ring is empty.");
+
+        var hash = ComputeHash(producerId);
+        var tail = _hashRing.Keys.FirstOrDefault(k => k >= hash);
+
+        var chosenKey = tail != 0 ? tail : _hashRing.Keys.First();
+        return _hashRing[chosenKey];
+    }
+
+    private static int ComputeHash(int key) => key % VirtualNodes;
 }

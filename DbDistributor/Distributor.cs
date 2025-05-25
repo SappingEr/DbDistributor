@@ -1,68 +1,62 @@
+using System.Collections.Concurrent;
+
 namespace DbDistributor;
 
 public class Distributor
 {
-    private readonly Zone[] _zones;
-    private readonly DataBase[] _dataBases;
+    private readonly ConcurrentDictionary<int, DataBase> _dataBases = new();
 
-    public Distributor(IEnumerable<Zone> zones)
+    public Distributor(IEnumerable<DataBase> dataBases)
     {
-        ArgumentNullException.ThrowIfNull(zones);
+        ArgumentNullException.ThrowIfNull(dataBases);
 
-        _zones = zones.OrderBy(z => z.From).ToArray();
+        var count = 0;
 
-        for (var i = 1; i < _zones.Length; i++)
+        foreach (var dataBase in dataBases)
         {
-            if (_zones[i].From <= _zones[i - 1].To)
-            {
-                throw new ArgumentException();
-            }
-        }
-
-        _dataBases = new DataBase[_zones.Length];
-
-        for (var index = 0; index < _zones.Length; index++)
-        {
-            _dataBases[index] = new DataBase();
+            _dataBases.TryAdd(count++, dataBase);
         }
     }
 
-    public IEnumerable<DataBase> DataBases => _dataBases;
+    public IReadOnlyCollection<DataBase> DataBases => _dataBases.Values.ToList();
 
     public async Task DistributeAsync(Row row)
     {
-        ArgumentNullException.ThrowIfNull(row);
-
-        var index = FindZoneIndex(row.ProducerId);
-
-        switch (index)
-        {
-            case >= 0:
-                await _dataBases[index].AddRowAsync(row);
-                break;
-            default:
-                throw new InvalidOperationException($"No zone found for ProducerId {row.ProducerId}");
-        }
+        var dataBaseId = GetDataBaseId(row.ProducerId);
+        await _dataBases[dataBaseId].AddRowAsync(new DbRow { ProducerId = row.ProducerId, Data = row.Data });
     }
 
-    private int FindZoneIndex(int producerId)
+    public IEnumerable<DbRow> GetProducerDataById(int producerId)
     {
-        var left = 0;
-        var right = _zones.Length - 1;
+        var dataBaseId = GetDataBaseId(producerId);
+        return _dataBases[dataBaseId].Rows.Where(r => r.Value.ProducerId == producerId).Select(r => r.Value);
+    }
 
-        while (left <= right)
+    public async Task AddDatabaseAsync()
+    {
+        var newId = _dataBases.Count;
+        _dataBases.TryAdd(newId, new DataBase());
+
+        var tasks = _dataBases
+            .Where(d => d.Key != newId)
+            .Select(async dataBase => await MoveRowsAsync(dataBase.Key, dataBase.Value));
+
+        await Task.WhenAll(tasks);
+    }
+
+    private int GetDataBaseId(int producerId) => producerId % _dataBases.Count;
+
+    private async Task MoveRowsAsync(int index, DataBase dataBase)
+    {
+        foreach (var row in dataBase.Rows)
         {
-            var mid = left + (right - left) / 2;
-            var zone = _zones[mid];
+            var dataBaseId = GetDataBaseId(row.Value.ProducerId);
 
-            if (producerId < zone.From)
-                right = mid - 1;
-            else if (producerId > zone.To)
-                left = mid + 1;
-            else
-                return mid;
+            if (dataBaseId == index)
+                continue;
+
+            await DistributeAsync(row.Value);
+            dataBase.Rows.TryRemove(row.Key, out _);
         }
-
-        return -1;
     }
 }
